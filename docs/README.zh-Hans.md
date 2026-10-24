@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/yasirmz/Capture/releases/latest"><img src="https://img.shields.io/badge/Download-Windows%2010%20%7C%2011-D9C4A1?style=for-the-badge&logo=windows&logoColor=1C1C1E" alt="Download for Windows"></a>
+  <a href="https://github.com/yasirmz/Capture/releases/latest/download/Capture-Setup.exe"><img src="https://img.shields.io/badge/Download-Windows%2010%20%7C%2011-D9C4A1?style=for-the-badge&logo=windows&logoColor=1C1C1E" alt="Download for Windows"></a>
   <img src="https://img.shields.io/badge/license-GPL--2.0-27272A?style=for-the-badge" alt="License: GPL-2.0">
   <img src="https://img.shields.io/badge/languages-7-27272A?style=for-the-badge" alt="7 languages">
 </p>
