@@ -1,6 +1,6 @@
 <#
   Writes src\Capture\app.ico (the exe, Explorer and Start menu icon) from the drawing the app itself uses for its
-  window (src\Capture\App\AppIconArt.cs): the warm plate, and the ring and dot in the theme's rose.
+  window (src\Capture\App\AppIconArt.cs): the grey plate, the grey replay arc and arrow, and the dot in the theme's beige.
   Build the solution first, then build again so the exe takes the new icon.
 #>
 param([string]$Out = (Join-Path $PSScriptRoot '..\src\Capture\app.ico'))

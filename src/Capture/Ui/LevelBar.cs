@@ -26,8 +26,8 @@ public sealed class LevelBar : FrameworkElement
             new GradientStop(Color.FromRgb(0xFF, 0xC9, 0x3C), 0.85),
             new GradientStop(Color.FromRgb(0xFF, 0x4A, 0x5E), 1.0),
         ], 0));
-    static readonly Brush Track = Frozen(new SolidColorBrush(Color.FromRgb(0x4E, 0x42, 0x41)));
-    static readonly Brush Marker = Frozen(new SolidColorBrush(Color.FromRgb(0xF5, 0xEC, 0xEA)));
+    static readonly Brush Track = Frozen(new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x3E)));
+    static readonly Brush Marker = Frozen(new SolidColorBrush(Color.FromRgb(0xEE, 0xEA, 0xE3)));
 
     static LevelStream? _stream;
     static int _users;

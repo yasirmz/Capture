@@ -451,12 +451,12 @@ public sealed class EditTimeline : FrameworkElement
         return r;
     }
 
-    static readonly Brush DarkText = Freeze(new SolidColorBrush(Color.FromRgb(0x22, 0x1C, 0x1B)));
+    static readonly Brush DarkText = Freeze(new SolidColorBrush(Color.FromRgb(0x18, 0x18, 0x1A)));
     static readonly Brush BoxFill = Freeze(new SolidColorBrush(Color.FromArgb(0x26, 0xF4, 0x8B, 0xA4)));
-    static readonly Pen BoxEdge = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0xF4, 0x8B, 0xA4))), 1.25) { DashStyle = DashStyles.Dash });
+    static readonly Pen BoxEdge = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0xD9, 0xC4, 0xA1))), 1.25) { DashStyle = DashStyles.Dash });
     static readonly Pen ChosenRing = Freeze(new Pen(Brushes.White, 2));
     static readonly Pen ChosenInner = Freeze(new Pen(DarkText, 1));
-    static readonly Pen DarkEdge = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x8A, 0x78, 0x75))), 1));
+    static readonly Pen DarkEdge = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x7A, 0x78, 0x74))), 1));
     static readonly Pen Stripe = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromArgb(0x70, 0x2E, 0x27, 0x26))), 2));
 
     static bool HasArabic(string s) => s.Any(c => c is >= '\u0600' and <= '\u06FF');
