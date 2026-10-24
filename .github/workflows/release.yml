@@ -1,0 +1,97 @@
+name: Release build
+
+# Builds Capture-Setup.exe and the update files with tools/release.ps1 on a Windows runner, with everything it needs
+# installed first (OBS Studio 32.2.2 for libobs, Inno Setup 6, vpk, Microsoft's Visual C++ runtime installer).
+# Run it from the Actions tab (Run workflow), or push a tag such as v1.1.0. The results are the run's artifacts:
+#   Capture-Setup      the installer people run
+#   Capture-release    every file a release page carries (installer, update packages, source zip, checksums)
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+    paths: ['.github/workflows/release.yml']
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      OBS_VERSION: '32.2.2'
+      INNO_VERSION: '6.7.0'
+      VPK_VERSION: '1.2.161'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      - name: vpk (Velopack's packer)
+        run: dotnet tool install -g vpk --version $env:VPK_VERSION
+
+      - name: OBS Studio (libobs is copied from it)
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP 'obs.zip'
+          $unpacked = Join-Path $env:RUNNER_TEMP 'obs'
+          Invoke-WebRequest "https://github.com/obsproject/obs-studio/releases/download/$env:OBS_VERSION/OBS-Studio-$env:OBS_VERSION-Windows-x64.zip" -OutFile $zip
+          Expand-Archive $zip $unpacked
+          # The folder that holds bin\64bit\obs.dll, wherever the zip put it
+          $root = (Get-ChildItem $unpacked -Recurse -Filter obs.dll | Where-Object { $_.Directory.Name -eq '64bit' -and $_.Directory.Parent.Name -eq 'bin' } |
+              Select-Object -First 1).Directory.Parent.Parent.FullName
+          if (-not $root) { throw 'obs.dll not found in the OBS zip' }
+          Move-Item $root 'C:\Program Files\obs-studio'
+          (Get-Item 'C:\Program Files\obs-studio\bin\64bit\obs.dll').VersionInfo.ProductVersion
+
+      - name: Inno Setup 6
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            $setup = Join-Path $env:RUNNER_TEMP 'innosetup.exe'
+            Invoke-WebRequest "https://files.jrsoftware.org/is/6/innosetup-$env:INNO_VERSION.exe" -OutFile $setup
+            Start-Process $setup -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/ALLUSERS', '/SP-' -Wait
+          }
+          if (-not (Test-Path $iscc)) { throw 'Inno Setup 6 did not install' }
+          (Get-Item $iscc).VersionInfo.ProductVersion
+
+      - name: Visual C++ runtime installer (carried by the wizard)
+        run: |
+          New-Item -ItemType Directory -Force installer\redist | Out-Null
+          Invoke-WebRequest 'https://aka.ms/vc14/vc_redist.x64.exe' -OutFile installer\redist\vc_redist.x64.exe
+
+      - name: Auto captions engine (from this repository's captions-runtime release)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download captions-runtime-1.9.5 --repo $env:GITHUB_REPOSITORY -p 'capture-captions-runtime-1.9.5.zip' -D releases\captions-runtime
+          (Get-FileHash releases\captions-runtime\capture-captions-runtime-1.9.5.zip -Algorithm SHA256).Hash
+
+      - name: Build the release
+        run: ./tools/release.ps1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Capture-Setup
+          path: releases/Capture-Setup.exe
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Capture-release
+          path: |
+            releases/Capture-*
+            releases/releases.*
+            releases/assets.*
+            releases/SHA256SUMS.txt
+            releases/release-notes-*.md
+            !releases/Capture-win-Setup.exe
+          if-no-files-found: error
