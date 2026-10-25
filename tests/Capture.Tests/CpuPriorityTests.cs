@@ -76,4 +76,14 @@ public static class CpuPriorityTests
         Assert.Equal(null, CpuPriority.Raised(ProcessPriorityClass.BelowNormal), "a test runner started it lower: left so");
         Assert.Equal(null, CpuPriority.Raised(ProcessPriorityClass.High), "the user set it higher: theirs");
     }
+
+    /// <summary>Game first: the process comes back to normal from Capture's own above normal, never from a class someone else chose.</summary>
+    [Test]
+    public static void Game_first_brings_back_only_capture_s_own_raise()
+    {
+        Assert.Equal(ProcessPriorityClass.Normal, CpuPriority.Lowered(ProcessPriorityClass.AboveNormal, ownRaise: true), "Capture raised it: normal again");
+        Assert.Equal(null, CpuPriority.Lowered(ProcessPriorityClass.AboveNormal, ownRaise: false), "the user set it: theirs");
+        Assert.Equal(null, CpuPriority.Lowered(ProcessPriorityClass.Normal, ownRaise: false), "normal already");
+        Assert.Equal(null, CpuPriority.Lowered(ProcessPriorityClass.High, ownRaise: true), "changed since by someone else: left so");
+    }
 }

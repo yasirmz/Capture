@@ -129,11 +129,10 @@ public static class LagGuardTests
     }
 
     [Test]
-    public static void Lighter_means_the_light_encoder_then_60_fps_and_1080p_then_30_fps_then_the_cpu()
+    public static void Lighter_means_realtime_then_60_fps_and_1080p_then_30_fps_then_the_cpu()
     {
         var mine = new VideoSettings { Fps = 120, Resolution = OutputResolution.Native, Codec = VideoCodec.Hevc };
         Assert.True(ReferenceEquals(mine, LagRelief.Video(mine, 0)), "none: as chosen");
-        Assert.True(ReferenceEquals(mine, LagRelief.Video(mine, LagRelief.LightEncoder)), "the light encoder: the same size and rate");
         Assert.True(ReferenceEquals(mine, LagRelief.Video(mine, LagRelief.Realtime)), "REALTIME: the same size and rate");
         var light = LagRelief.Video(mine, LagRelief.Capped);
         Assert.True(light.Fps == 60 && light.Resolution == OutputResolution.P1080 && light.Codec == VideoCodec.Hevc, "60 fps, 1080p, the same encoder");
@@ -148,42 +147,57 @@ public static class LagGuardTests
 
     /// <summary>
     /// A user's RTX 3060 Ti in ARC Raiders: 43 % skipped with nothing lighter left ("already as light as it goes": 1080p60
-    /// with 8 threads). Every step that changes something comes in turn: the light encoder (NVIDIA's only), REALTIME
-    /// (not on Intel graphics), then the picture.
+    /// with 8 threads). Every step that changes something comes in turn: REALTIME (not on Intel graphics, nor with Game
+    /// first), then the picture.
     /// </summary>
     [Test]
     public static void A_step_that_would_change_nothing_is_skipped()
     {
         var p1080 = new VideoSettings { Fps = 60, Resolution = OutputResolution.P1080 };
-        int Next(VideoSettings v, int relief, int max, bool nvidia = true, bool realtime = true) => LagRelief.Next(v, relief, max, nvidia, realtime);
-        Assert.Equal(LagRelief.LightEncoder, Next(p1080, 0, LagRelief.HalfRate), "NVIDIA: the light encoder first");
-        Assert.Equal(LagRelief.Realtime, Next(p1080, LagRelief.LightEncoder, LagRelief.HalfRate), "then REALTIME");
+        int Next(VideoSettings v, int relief, int max, bool realtime = true) => LagRelief.Next(v, relief, max, realtime);
+        Assert.Equal(LagRelief.Realtime, Next(p1080, 0, LagRelief.HalfRate), "REALTIME first");
         Assert.Equal(LagRelief.HalfRate, Next(p1080, LagRelief.Realtime, LagRelief.HalfRate), "already 1080p60: then 30 fps");
-        Assert.Equal(LagRelief.Realtime, Next(p1080, 0, LagRelief.HalfRate, nvidia: false), "AMD: no light encoder, REALTIME first");
-        Assert.Equal(LagRelief.HalfRate, Next(p1080, 0, LagRelief.HalfRate, nvidia: false, realtime: false), "Intel: straight to 30 fps");
+        Assert.Equal(LagRelief.HalfRate, Next(p1080, 0, LagRelief.HalfRate, realtime: false), "Intel, or Game first: straight to 30 fps");
         Assert.Equal(LagRelief.Cpu, Next(p1080, LagRelief.HalfRate, LagRelief.Cpu), "then the CPU, with room for it");
         Assert.Equal(LagRelief.HalfRate, Next(p1080, LagRelief.HalfRate, LagRelief.HalfRate), "nothing lighter left");
         var p1440 = new VideoSettings { Fps = 120, Resolution = OutputResolution.P1440 };
         Assert.Equal(LagRelief.Capped, Next(p1440, LagRelief.Realtime, LagRelief.Cpu), "1440p120: then 60 fps and 1080p");
+        Assert.Equal(LagRelief.Capped, Next(p1440, 0, LagRelief.Cpu, realtime: false), "Game first at 1440p120: 60 fps and 1080p first");
         var p30 = new VideoSettings { Fps = 30, Resolution = OutputResolution.P720 };
-        Assert.Equal(LagRelief.Realtime, Next(p30, LagRelief.LightEncoder, LagRelief.HalfRate), "720p30: REALTIME still helps");
+        Assert.Equal(LagRelief.Realtime, Next(p30, 0, LagRelief.HalfRate), "720p30: REALTIME still helps");
         Assert.Equal(LagRelief.Realtime, Next(p30, LagRelief.Realtime, LagRelief.HalfRate), "and nothing after it");
+        Assert.Equal(0, Next(p30, 0, LagRelief.HalfRate, realtime: false), "720p30 with Game first: nothing lighter at all");
     }
 
-    /// <summary>The light encoder drops NVIDIA's CUDA passes (the same CQ measured as good or better); nothing else changes.</summary>
+    /// <summary>
+    /// NVIDIA's encoder runs without the passes it puts on CUDA, the game's shader cores (the same CQ measured as good or
+    /// better); the CQ, preset, B-frames and cap are the plan's.
+    /// </summary>
     [Test]
-    public static void The_light_encoder_turns_off_nvidias_cuda_passes_only()
+    public static void Nvidias_encoder_leaves_the_cuda_passes_to_the_game()
     {
         var plan = new EncoderPlan("obs_nvenc_h264_tex", "CQVBR", 24, 24000, 1, "p5", 2);
-        var nvenc = new EncoderChoice("obs_nvenc_h264_tex", EncoderVendor.Nvidia, VideoCodec.H264);
-        var full = EncoderCatalog.Settings(plan, nvenc);
-        var light = EncoderCatalog.Settings(plan, nvenc, light: true);
-        Assert.True(full["multipass"] is "qres" && full["adaptive_quantization"] is true && full["target_quality"] is 24L, "as chosen: full");
-        Assert.True(light["multipass"] is "disabled" && light["adaptive_quantization"] is false, "light: no multipass, no AQ");
-        Assert.True(light["target_quality"].Equals(full["target_quality"]) && light["preset"].Equals(full["preset"]) && light["bf"].Equals(full["bf"])
-                    && light["max_bitrate"].Equals(full["max_bitrate"]), "the same CQ, preset, B-frames and cap");
-        var amd = new EncoderChoice("h264_texture_amf", EncoderVendor.Amd, VideoCodec.H264);
-        Assert.Equal(EncoderCatalog.Settings(plan, amd).Count, EncoderCatalog.Settings(plan, amd, light: true).Count, "other vendors: as they are");
+        var nvenc = EncoderCatalog.Settings(plan, new EncoderChoice("obs_nvenc_h264_tex", EncoderVendor.Nvidia, VideoCodec.H264));
+        Assert.True(nvenc["multipass"] is "disabled" && nvenc["adaptive_quantization"] is false && nvenc["lookahead"] is false,
+            "no multipass, no AQ, no look-ahead");
+        Assert.True(nvenc["target_quality"] is 24L && nvenc["preset"] is "p5" && nvenc["bf"] is 2L && nvenc["max_bitrate"] is 24000L,
+            "the plan's CQ, preset, B-frames and cap");
+    }
+
+    /// <summary>
+    /// Game first keeps the recording at Windows' usual priority on the graphics card (never REALTIME, and HIGH, which
+    /// libobs sets as administrator, comes down); otherwise libobs's class, and REALTIME at its own step.
+    /// </summary>
+    [Test]
+    public static void Game_first_never_puts_the_recording_ahead_on_the_graphics_card()
+    {
+        const int normal = 2, high = 4, realtime = 5; // D3DKMT_SCHEDULINGPRIORITYCLASS
+        Assert.Equal(normal, GpuPriority.ClassFor(realtime: false, raised: false, libobs: high, intel: false), "game first: HIGH comes down");
+        Assert.Equal(normal, GpuPriority.ClassFor(realtime: false, raised: false, libobs: normal, intel: false), "game first: normal stays");
+        Assert.Equal(1, GpuPriority.ClassFor(realtime: false, raised: false, libobs: 1, intel: false), "game first: a lower class is never raised");
+        Assert.Equal(high, GpuPriority.ClassFor(realtime: false, raised: true, libobs: high, intel: false), "recording first: libobs's own");
+        Assert.Equal(realtime, GpuPriority.ClassFor(realtime: true, raised: true, libobs: high, intel: false), "recording first, behind: REALTIME");
+        Assert.Equal(high, GpuPriority.ClassFor(realtime: true, raised: true, libobs: high, intel: true), "never REALTIME on Intel graphics");
     }
 
     [Test]
@@ -205,7 +219,6 @@ public static class LagGuardTests
         Text.Language = "en";
         var engine = new EngineStatus(true, false, 60, 0, 0, 0, 300, 300, "x", 1920, 1080, 0, 0, @"D:\Clips", false, null);
         Assert.Equal("", Ui.StatusLogic.CaptureWarning(engine), "nothing to say");
-        Assert.Equal(Text.Get("status.reliefEncoder"), Ui.StatusLogic.CaptureWarning(engine with { Relief = LagRelief.LightEncoder }), "the light encoder");
         Assert.Equal(Text.Get("status.reliefPriority"), Ui.StatusLogic.CaptureWarning(engine with { Relief = LagRelief.Realtime }), "REALTIME");
         Assert.Equal(Text.Get("status.relief"), Ui.StatusLogic.CaptureWarning(engine with { Relief = LagRelief.Capped }), "lighter");
         Assert.Equal(Text.Get("status.reliefHalf"), Ui.StatusLogic.CaptureWarning(engine with { Relief = LagRelief.HalfRate }), "30 fps");
@@ -234,11 +247,9 @@ public static class LagGuardTests
     [Test]
     public static void Only_the_realtime_step_is_taken_as_the_recording_runs()
     {
-        Assert.True(LagRelief.Live(LagRelief.LightEncoder, LagRelief.Realtime, nvidia: true), "NVIDIA: the light encoder runs already, only the class changes");
-        Assert.True(LagRelief.Live(0, LagRelief.Realtime, nvidia: false), "another card has no light encoder step: only the class");
-        Assert.True(!LagRelief.Live(0, LagRelief.Realtime, nvidia: true), "NVIDIA from its usual encoder: the light one needs the encoder anew");
-        Assert.True(!LagRelief.Live(0, LagRelief.LightEncoder, nvidia: true), "the light encoder needs the encoder anew");
-        Assert.True(!LagRelief.Live(LagRelief.Realtime, LagRelief.HalfRate, nvidia: true), "30 fps needs the video anew");
+        Assert.True(LagRelief.Live(0, LagRelief.Realtime), "REALTIME: only the class changes");
+        Assert.True(!LagRelief.Live(0, LagRelief.Capped), "60 fps and 1080p need the video anew");
+        Assert.True(!LagRelief.Live(LagRelief.Realtime, LagRelief.HalfRate), "30 fps needs the video anew");
     }
 
     /// <summary>

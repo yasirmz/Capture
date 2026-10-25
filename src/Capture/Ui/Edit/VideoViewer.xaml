@@ -3,8 +3,9 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:l="clr-namespace:CaptureApp.Ui"
              Focusable="False">
-    <!-- A clip in Capture's own player over the window: play, seek, sound, edit, share, show, delete. Esc or a click outside closes. -->
-    <Grid x:Name="Scrim" Background="#E0111113" MouseLeftButtonDown="OnScrimClick">
+    <!-- A clip in Capture's own player over the window: play, seek, sound, full screen, edit, share, show, delete. Esc or a
+         click outside closes (Esc leaves full screen first). -->
+    <Grid x:Name="Scrim" Background="#E0111113" MouseLeftButtonDown="OnScrimClick" MouseMove="OnPointerMove">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -12,7 +13,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <Grid Margin="28,44,20,10" WindowChrome.IsHitTestVisibleInChrome="True">
+        <Grid x:Name="Header" Margin="28,44,20,10" WindowChrome.IsHitTestVisibleInChrome="True">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
@@ -35,9 +36,11 @@
             </Button>
         </Grid>
 
-        <!-- Never mirrored: a clip plays the same in Arabic -->
+        <!-- Never mirrored: a clip plays the same in Arabic. In full screen it fills the screen, its top included, which
+             is otherwise the window's title bar (a click there would drag the window out of full screen). -->
         <Border x:Name="Frame" Grid.Row="1" Margin="28,0" CornerRadius="10" ClipToBounds="True" HorizontalAlignment="Center" VerticalAlignment="Center"
-                BorderBrush="{StaticResource Stroke}" BorderThickness="1" Background="Black" MouseLeftButtonDown="OnVideoClick" Cursor="Hand">
+                BorderBrush="{StaticResource Stroke}" BorderThickness="1" Background="Black" MouseLeftButtonDown="OnVideoClick" Cursor="Hand"
+                WindowChrome.IsHitTestVisibleInChrome="True">
             <Border.Effect>
                 <DropShadowEffect BlurRadius="40" ShadowDepth="0" Opacity="0.5" Color="Black"/>
             </Border.Effect>
@@ -52,12 +55,14 @@
             </Grid>
         </Border>
 
-        <!-- Play, where it is, and the sound -->
-        <Grid Grid.Row="2" Margin="28,14,28,0" MaxWidth="900" WindowChrome.IsHitTestVisibleInChrome="True">
+        <!-- Play, where it is, the sound and full screen; in full screen over the clip's foot, gone while the pointer rests -->
+        <Border x:Name="Bar" Grid.Row="2" Margin="28,14,28,0" MaxWidth="900" CornerRadius="10" WindowChrome.IsHitTestVisibleInChrome="True">
+        <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <Button x:Name="PlayButton" Style="{StaticResource Ghost}" Padding="11,9" Click="OnPlay" VerticalAlignment="Center">
@@ -70,9 +75,13 @@
             <Button x:Name="MuteButton" Grid.Column="3" Style="{StaticResource Ghost}" Padding="11,9" Margin="12,0,0,0" Click="OnMute" VerticalAlignment="Center">
                 <TextBlock x:Name="MuteIcon" Style="{StaticResource Icon}" Text="&#xE767;" FontSize="13"/>
             </Button>
+            <Button x:Name="FullScreenButton" Grid.Column="4" Style="{StaticResource Ghost}" Padding="11,9" Margin="4,0,0,0" Click="OnFullScreen" VerticalAlignment="Center">
+                <TextBlock x:Name="FullScreenIcon" Style="{StaticResource Icon}" Text="&#xE740;" FontSize="13"/>
+            </Button>
         </Grid>
+        </Border>
 
-        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,16,0,24" WindowChrome.IsHitTestVisibleInChrome="True">
+        <StackPanel x:Name="Actions" Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,16,0,24" WindowChrome.IsHitTestVisibleInChrome="True">
             <Button Style="{StaticResource Primary}" Click="OnShare" Padding="18,9" Margin="0,0,8,0" AutomationProperties.Name="{l:T clips.share}">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Style="{StaticResource Icon}" Text="&#xE72D;" FontSize="13" Margin="0,0,8,0" VerticalAlignment="Center"/>

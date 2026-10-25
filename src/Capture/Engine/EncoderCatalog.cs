@@ -93,10 +93,10 @@ public static class EncoderCatalog
     }
 
     /// <summary>
-    /// libobs encoder settings for <paramref name="choice"/>, from the quality numbers in <paramref name="plan"/>;
-    /// <paramref name="light"/>: NVIDIA's encoder kept off the shader cores a game fills (<see cref="LagRelief.LightEncoder"/>).
+    /// libobs encoder settings for <paramref name="choice"/>, from the quality numbers in <paramref name="plan"/>. NVIDIA's
+    /// encoder is kept off the shader cores a game fills.
     /// </summary>
-    public static Dictionary<string, object> Settings(EncoderPlan plan, EncoderChoice choice, bool light = false)
+    public static Dictionary<string, object> Settings(EncoderPlan plan, EncoderChoice choice)
     {
         // plan.Cq is on the 1-63 scale for AV1 and the 1-51 scale for HEVC/H.264 (see EncoderPresets).
         long cq = plan.Cq;
@@ -113,14 +113,15 @@ public static class EncoderCatalog
                 s["bitrate"] = (long)plan.MaxBitrateKbps;
                 s["preset"] = CaptureApp.Settings.VideoSettings.Capped(plan.Preset); // p6/p7 turn look-ahead on whatever "lookahead" says
                 s["tune"] = "hq";
-                // The light encoder: NVIDIA runs the quarter-size pass and the adaptive quantization on CUDA. At the same CQ
-                // its gameplay VMAF came out as high or higher (H.264 95.8 -> 96.5, HEVC 95.6 -> 96.3, AV1 96.3 -> 96.7),
-                // the clips about 5 % larger.
-                s["multipass"] = light ? "disabled" : "qres";
+                // No quarter-size pass and no adaptive quantization: NVIDIA runs both on CUDA, on the shader cores the game
+                // draws with. At the same CQ the gameplay VMAF came out as high or higher without them (H.264 95.8 -> 96.5,
+                // HEVC 95.6 -> 96.3, AV1 96.3 -> 96.7), the clips about 5 % larger. Once a step taken only when recording
+                // fell behind a game, now the usual: the game keeps those cores from the start.
+                s["multipass"] = "disabled";
                 s["profile"] = profile;
                 s["bf"] = choice.NoBFrames ? 0L : (long)plan.BFrames;
                 s["lookahead"] = false;
-                s["adaptive_quantization"] = !light;
+                s["adaptive_quantization"] = false;
                 break;
             case EncoderVendor.Amd:
                 s["rate_control"] = "QVBR";

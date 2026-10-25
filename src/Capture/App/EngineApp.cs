@@ -76,6 +76,8 @@ public sealed class EngineApp : ApplicationContext
     readonly UpdateService _updates = UpdateService.ForThisInstall(SettingsStore.AppDataDir);
     /// <summary>When the replay buffer first ran (the first update check waits a minute after it).</summary>
     DateTime? _bufferActiveSince;
+    /// <summary>When the engine started (the first update check comes a few minutes after it when the buffer never ran).</summary>
+    readonly DateTime _startedUtc = DateTime.UtcNow;
     /// <summary>What the settings window last said with its status question: in use or not, and when (a downloaded update waits for it).</summary>
     bool _windowSaidBusy;
     DateTime _windowAsked;
@@ -142,7 +144,7 @@ public sealed class EngineApp : ApplicationContext
             if (_saveWatch.Tick(now, _lag.Behind) is { } never)
                 NotSaved(never);
             WatchUnenteredGame();
-            if (UpdateRules.ShouldCheck(_settings.General.CheckUpdates && _updates.Available, _bufferActiveSince, _updates.LastCheck, DateTime.UtcNow))
+            if (UpdateRules.ShouldCheck(_settings.General.CheckUpdates && _updates.Available, _bufferActiveSince, _startedUtc, _updates.LastCheck, DateTime.UtcNow))
                 CheckForUpdate();
             RemindUpdate();
             TryApplyUpdate();

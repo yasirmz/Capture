@@ -16,6 +16,8 @@ public static class SettingsTests
         Assert.Equal(60, s.Video.Fps, "fps");
         Assert.Equal(VideoCodec.H264, s.Video.Codec, "codec: H.264, plays everywhere");
         Assert.Equal(QualityPreset.Ultra, s.Video.Quality, "quality");
+        Assert.Equal(true, s.Video.GameFirst, "game first: the game's FPS before the recording");
+        Assert.Equal(true, SettingsStore.Deserialize("""{"video":{"fps":60}}""").Video.GameFirst, "a file from before it: game first too");
         Assert.Equal(true, s.Audio.System, "system audio");
         Assert.Equal(true, s.Audio.Mic, "mic on");
         Assert.Equal("default", s.Audio.MicDevice, "windows default mic");

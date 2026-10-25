@@ -35,6 +35,24 @@
             </Grid>
         </Border>
 
+        <!-- Game first: the game before the recording on the processor and the graphics card, with Automatic or without -->
+        <Border Style="{StaticResource Card}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource Icon}" Text="&#xE7FC;" FontSize="18" Foreground="{DynamicResource Accent}" Margin="0,2,12,0" VerticalAlignment="Top"/>
+                <StackPanel Grid.Column="1" Margin="0,0,16,0">
+                    <TextBlock Style="{StaticResource Section}" Text="{l:T quality.gameFirst}"/>
+                    <TextBlock Style="{StaticResource Caption}" Text="{l:T quality.gameFirstTip}" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                </StackPanel>
+                <CheckBox Grid.Column="2" Style="{StaticResource Switch}" IsChecked="{Binding GameFirst}" VerticalAlignment="Center"
+                          AutomationProperties.Name="{l:T quality.gameFirst}"/>
+            </Grid>
+        </Border>
+
         <!-- AV1 recorded, but Windows cannot play it (no AV1 Video Extension): the free extension, one click -->
         <Border Style="{StaticResource Card}" Visibility="{Binding Av1NeedsExtension, Converter={StaticResource Vis}}">
             <Grid>

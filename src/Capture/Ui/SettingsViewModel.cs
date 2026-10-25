@@ -1359,6 +1359,9 @@ public sealed partial class SettingsViewModel : INotifyPropertyChanged
     public bool AutoQuality { get => _s.Video.Auto; set => Set(() => _s.Video.Auto = value); }
     public bool ManualQuality => !_s.Video.Auto;
 
+    /// <summary>The game before the recording on the processor and the graphics card (with Automatic or without).</summary>
+    public bool GameFirst { get => _s.Video.GameFirst; set => Set(() => _s.Video.GameFirst = value); }
+
     /// <summary>What Automatic records with now (from the engine), or what it does while off or before the engine says.</summary>
     public string AutoLine => AutoQuality && _status?.Engine?.Auto is { } auto ? StatusLogic.AutoLine(auto) : Text.Get("quality.autoTip");
 

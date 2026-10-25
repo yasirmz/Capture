@@ -2,7 +2,7 @@
 <#
   Offline A/B of Capture's Ultra preset against candidate NVENC settings, with ffmpeg's own NVENC (the same encoder OBS
   drives) and VMAF. A reference clip (high motion, 1440p60) is encoded once with Capture's Ultra parameters (CQVBR 22,
-  60 Mb/s cap, tune hq, multipass qres, 1 s key frames, 2 B-frames, no lookahead) and once per candidate; each is
+  60 Mb/s cap, tune hq, no multipass, 1 s key frames, 2 B-frames, no lookahead) and once per candidate; each is
   scored against the reference. Without -Reference, a 5 s synthetic one is made (moving test pattern with grain).
   Runs hidden-friendly (no window) at below-normal priority. Prints a table and writes quality-ab.csv to -Out.
   A preset changes only for at least 1 VMAF point at no more than 10 % more size, and never for longer key frames
@@ -34,12 +34,13 @@ if (-not $Reference) {
 }
 
 # Capture's Ultra (EncoderPresets.Plan + EncoderCatalog.Settings at 1440p60 AV1), and the candidates.
-function Settings([int]$lookahead = 0, [string]$multipass = 'qres', [int]$gop = 60) {
+function Settings([int]$lookahead = 0, [string]$multipass = 'disabled', [int]$gop = 60) {
     @('-c:v', $Codec, '-preset', 'p5', '-tune', 'hq', '-rc', 'vbr', '-cq', '22', '-b:v', '0', '-maxrate', '60M', '-bufsize', '120M',
         '-bf', '2', '-g', "$gop", '-rc-lookahead', "$lookahead", '-multipass', $multipass, '-pix_fmt', 'yuv420p')
 }
 $variants = [ordered]@{
     'capture-ultra'      = Settings
+    'multipass-qres'    = Settings -multipass 'qres'
     'multipass-fullres' = Settings -multipass 'fullres'
     'lookahead-20'      = Settings -lookahead 20
     'keyframes-2s'      = Settings -gop 120

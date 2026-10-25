@@ -32,6 +32,7 @@ public static class LogLines
             ("quality", v.Auto ? "auto"
                 : $"{EncoderCatalog.CodecName(v.Codec)} {v.Resolution} {v.Fps}fps {v.Quality}"
                   + (v.Quality == QualityPreset.Custom ? $" cq{v.CustomCq} {v.CustomMbps}Mbps" : "")),
+            ("game-first", OnOff(v.GameFirst)),
             ("replay", OnOff(r.Enabled)),
             ("length", $"{r.Seconds}s"),
             ("replay-store", r.OnDisk ? $"disk {r.DiskDrive ?? "auto"}" : "ram"),

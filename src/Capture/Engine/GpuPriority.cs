@@ -4,17 +4,19 @@ using CaptureApp.Native;
 namespace CaptureApp.Engine;
 
 /// <summary>
-/// The graphics device's GPU thread priority raised as OBS raises it (libobs-d3d11's set_priority), which libobs manages
-/// only when it runs as administrator: it logs "D3D11 GPU priority setup failed (not admin?)". Windows lets any process
-/// raise its own (measured 2026-10-22, Windows 11 26300 with hardware scheduling on: the process class was HIGH already,
-/// the thread priority went 0 → 7), so a game that takes the graphics card leaves the recording more of it. Intel
-/// graphics are left as they are, as OBS leaves them.
+/// The recording's claim on the graphics card. With Game first (<see cref="Settings.VideoSettings.GameFirst"/>) it is
+/// Windows' usual: the game's frames never wait for the recording's. Otherwise the graphics device's GPU thread priority
+/// is raised as OBS raises it (libobs-d3d11's set_priority), which libobs manages only when it runs as administrator: it
+/// logs "D3D11 GPU priority setup failed (not admin?)". Windows lets any process raise its own (measured 2026-10-22,
+/// Windows 11 26300 with hardware scheduling on: the process class was HIGH already, the thread priority went 0 → 7), so
+/// a game that takes the graphics card leaves the recording more of it. Intel graphics are left as they are, as OBS
+/// leaves them.
 /// </summary>
 static unsafe class GpuPriority
 {
-    const int Highest = 7;
+    const int Highest = 7, Usual = 0;
     const uint IntelVendor = 0x8086;
-    const int ClassHigh = 4, ClassRealtime = 5; // D3DKMT_SCHEDULINGPRIORITYCLASS
+    const int ClassNormal = 2, ClassHigh = 4, ClassRealtime = 5; // D3DKMT_SCHEDULINGPRIORITYCLASS
 
     /// <summary>libobs's graphics are Intel's (no priority raised, as OBS leaves them).</summary>
     public static bool Intel { get; private set; }
@@ -23,6 +25,9 @@ static unsafe class GpuPriority
     static int? _libobs;
     static int _class;
 
+    /// <summary>Whether the thread priority was last asked raised (null: not asked yet).</summary>
+    static bool? _threadRaised;
+
     [DllImport("gdi32.dll")]
     static extern int D3DKMTSetProcessSchedulingPriorityClass(IntPtr process, int priority);
 
@@ -30,10 +35,17 @@ static unsafe class GpuPriority
     static extern int D3DKMTGetProcessSchedulingPriorityClass(IntPtr process, out int priority);
 
     /// <summary>
-    /// The process's GPU scheduling class: REALTIME for <see cref="LagRelief.Realtime"/> (any process may take it on
-    /// Windows 11, measured 2026-10-22), else the one libobs set; what changed, for the log, or null when nothing did.
+    /// The class to run at: REALTIME for <see cref="LagRelief.Realtime"/> (never on Intel graphics); the one libobs set
+    /// when <paramref name="raised"/>; otherwise normal at most (libobs sets HIGH when it runs as administrator).
     /// </summary>
-    public static string? SetClass(bool realtime)
+    internal static int ClassFor(bool realtime, bool raised, int libobs, bool intel) =>
+        realtime && !intel ? ClassRealtime : raised ? libobs : Math.Min(libobs, ClassNormal);
+
+    /// <summary>
+    /// The process's GPU scheduling class (<see cref="ClassFor"/>; any process may take REALTIME on Windows 11, measured
+    /// 2026-10-22); what changed, for the log, or null when nothing did.
+    /// </summary>
+    public static string? SetClass(bool realtime, bool raised)
     {
         using var process = System.Diagnostics.Process.GetCurrentProcess();
         IntPtr self = process.Handle;
@@ -42,19 +54,51 @@ static unsafe class GpuPriority
             D3DKMTGetProcessSchedulingPriorityClass(self, out int set);
             _libobs = _class = set;
         }
-        int wanted = realtime && !Intel ? ClassRealtime : _libobs.Value;
+        int wanted = ClassFor(realtime, raised, _libobs.Value, Intel);
         if (wanted == _class)
             return null;
         int status = D3DKMTSetProcessSchedulingPriorityClass(self, wanted);
         D3DKMTGetProcessSchedulingPriorityClass(self, out int now);
         _class = now;
-        string name = now switch { ClassRealtime => "REALTIME (the recording fell behind a game)", ClassHigh => "HIGH", _ => now.ToString() };
+        string name = now switch
+        {
+            ClassRealtime => "REALTIME (the recording fell behind a game)", ClassHigh => "HIGH", ClassNormal => "NORMAL", _ => now.ToString(),
+        };
         return status != 0 ? $"class {wanted} refused (0x{status:X8}), now {name}" : $"class {name}";
     }
     static readonly Guid DxgiDevice = new("54ec77fa-1377-44e6-8c32-88fd5f44c84c");
 
-    /// <summary>Raises it on libobs's device (after the first video reset made it); what happened, for the log.</summary>
-    public static string Raise()
+    /// <summary>
+    /// libobs's device, after the first video reset made it: whose it is (<see cref="Intel"/>), and its memory watched
+    /// (<see cref="GpuMemory"/>). What there is to say, for the log, or null.
+    /// </summary>
+    public static string? Find() => OnDevice(dxgi =>
+    {
+        GpuMemory.Watch(dxgi);
+        Intel = VendorOf(dxgi) == IntelVendor;
+        return Intel ? "Intel graphics: left as they are" : null;
+    });
+
+    /// <summary>
+    /// The device's GPU thread priority: the highest when <paramref name="raised"/>, else Windows' usual. What changed,
+    /// for the log, or null when nothing was asked anew (and always on Intel graphics).
+    /// </summary>
+    public static string? SetThread(bool raised)
+    {
+        if (_threadRaised == raised || Intel)
+            return null;
+        _threadRaised = raised;
+        return OnDevice(dxgi =>
+        {
+            int hr = ((delegate* unmanaged[Stdcall]<IntPtr, int, int>)Vtable(dxgi)[10])(dxgi, raised ? Highest : Usual); // SetGPUThreadPriority
+            int now;
+            ((delegate* unmanaged[Stdcall]<IntPtr, int*, int>)Vtable(dxgi)[11])(dxgi, &now); // GetGPUThreadPriority
+            return hr < 0 ? $"refused (0x{hr:X8})" : $"thread priority {now}{(raised ? "" : " (game first)")}";
+        });
+    }
+
+    /// <summary>Runs <paramref name="use"/> on libobs's DXGI device, inside its graphics context; what it says, for the log.</summary>
+    static string? OnDevice(Func<IntPtr, string?> use)
     {
         Obs.obs_enter_graphics();
         try
@@ -66,14 +110,7 @@ static unsafe class GpuPriority
                 return "no DXGI device";
             try
             {
-                GpuMemory.Watch(dxgi);
-                Intel = VendorOf(dxgi) == IntelVendor;
-                if (Intel)
-                    return "Intel graphics: left as they are";
-                int hr = ((delegate* unmanaged[Stdcall]<IntPtr, int, int>)Vtable(dxgi)[10])(dxgi, Highest); // SetGPUThreadPriority
-                int now;
-                ((delegate* unmanaged[Stdcall]<IntPtr, int*, int>)Vtable(dxgi)[11])(dxgi, &now); // GetGPUThreadPriority
-                return hr < 0 ? $"refused (0x{hr:X8})" : $"thread priority {now}";
+                return use(dxgi);
             }
             finally
             {

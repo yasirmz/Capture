@@ -62,6 +62,7 @@ public partial class MainWindow : Window
         VideoLayer.ShareRequested += clip => _share.Open(clip.Path, clip.Thumbnail);
         VideoLayer.ShowRequested += clip => _clips.ShowCommand.Execute(clip);
         VideoLayer.DeleteRequested += clip => _clips.DeleteCommand.Execute(clip);
+        VideoLayer.FullScreenChanged += SetFullScreen;
         Closed += (_, _) => VideoLayer.Hide();
         VideoLayer.EditRequested += clip => OpenEditor(clip.Path, isPicture: false, Edit.EditorMode.Library);
         PictureLayer.EditRequested += picture => OpenEditor(picture.Path, isPicture: true, Edit.EditorMode.Library);
@@ -184,9 +185,39 @@ public partial class MainWindow : Window
     {
         base.OnStateChanged(e);
         bool max = WindowState == WindowState.Maximized;
-        // A maximized custom-chrome window extends past the screen by the resize border; pad it back in.
-        Root.Margin = max ? new Thickness(7) : new Thickness(0);
+        // A maximized custom-chrome window extends past the screen by the resize border; pad it back in (full screen has none).
+        Root.Margin = max && _windowed == null ? new Thickness(7) : new Thickness(0);
         MaxButton.Content = max ? "" : "";
+    }
+
+    /// <summary>How the window was before the player went full screen (null: it is not), put back after.</summary>
+    (WindowState State, WindowStyle Style, ResizeMode Resize)? _windowed;
+
+    /// <summary>
+    /// The player's full screen: the window over the whole screen, the taskbar too (a window without a title bar or a
+    /// resize border is maximized over it), then back as it was.
+    /// </summary>
+    void SetFullScreen(bool on)
+    {
+        WindowButtons.Visibility = on ? Visibility.Collapsed : Visibility.Visible; // over the clip otherwise
+        if (on == (_windowed != null) || PresentationSource.FromVisual(this) == null)
+            return; // as asked already, or the window is closed (or never shown: --render)
+        if (on)
+        {
+            _windowed = (WindowState, WindowStyle, ResizeMode);
+            WindowState = WindowState.Normal; // maximized anew below, without its frame
+            WindowStyle = WindowStyle.None;
+            ResizeMode = ResizeMode.NoResize;
+            WindowState = WindowState.Maximized;
+        }
+        else if (_windowed is { } was)
+        {
+            _windowed = null;
+            WindowState = WindowState.Normal;
+            WindowStyle = was.Style;
+            ResizeMode = was.Resize;
+            WindowState = was.State;
+        }
     }
 
     protected override void OnSourceInitialized(EventArgs e)

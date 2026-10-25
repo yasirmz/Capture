@@ -12,12 +12,27 @@ public static class UpdateRulesTests
     [Test]
     public static void The_first_check_waits_a_minute_after_the_buffer_then_daily()
     {
-        Assert.True(!UpdateRules.ShouldCheck(false, T0, null, T0.AddHours(5)), "turned off: never");
-        Assert.True(!UpdateRules.ShouldCheck(true, null, null, T0), "the replay buffer never ran: not yet");
-        Assert.True(!UpdateRules.ShouldCheck(true, T0, null, T0.AddSeconds(59)), "59 s after the buffer: not yet");
-        Assert.True(UpdateRules.ShouldCheck(true, T0, null, T0.AddSeconds(61)), "61 s after: yes");
-        Assert.True(!UpdateRules.ShouldCheck(true, T0, T0.AddMinutes(1), T0.AddHours(23)), "checked 23 h ago: no");
-        Assert.True(UpdateRules.ShouldCheck(true, T0, T0.AddMinutes(1), T0.AddMinutes(1).AddHours(24).AddSeconds(1)), "a day later: yes");
+        Assert.True(!UpdateRules.ShouldCheck(false, T0, T0, null, T0.AddHours(5)), "turned off: never");
+        Assert.True(!UpdateRules.ShouldCheck(true, null, T0, null, T0), "the replay buffer never ran: not yet");
+        Assert.True(!UpdateRules.ShouldCheck(true, T0, T0, null, T0.AddSeconds(59)), "59 s after the buffer: not yet");
+        Assert.True(UpdateRules.ShouldCheck(true, T0, T0, null, T0.AddSeconds(61)), "61 s after: yes");
+        Assert.True(!UpdateRules.ShouldCheck(true, T0, T0, T0.AddMinutes(1), T0.AddHours(23)), "checked 23 h ago: no");
+        Assert.True(UpdateRules.ShouldCheck(true, T0, T0, T0.AddMinutes(1), T0.AddMinutes(1).AddHours(24).AddSeconds(1)), "a day later: yes");
+    }
+
+    /// <summary>
+    /// Instant replay off, or waiting for a game that never came: the buffer never runs, and Capture looked for updates
+    /// never. It looks a few minutes after the start instead.
+    /// </summary>
+    [Test]
+    public static void Without_the_replay_buffer_the_first_check_comes_a_few_minutes_after_the_start()
+    {
+        Assert.True(!UpdateRules.ShouldCheck(true, null, T0, null, T0.AddMinutes(4)), "4 min after the start: not yet");
+        Assert.True(UpdateRules.ShouldCheck(true, null, T0, null, T0.AddMinutes(5)), "5 min after: yes, buffer or not");
+        Assert.True(!UpdateRules.ShouldCheck(false, null, T0, null, T0.AddHours(5)), "turned off: still never");
+        Assert.True(!UpdateRules.ShouldCheck(true, null, T0, T0.AddMinutes(5), T0.AddHours(23)), "then daily, as with the buffer");
+        Assert.True(UpdateRules.ShouldCheck(true, T0.AddMinutes(4).AddSeconds(30), T0, null, T0.AddMinutes(5)),
+            "the buffer up late (4.5 min): the start's 5 min still count");
     }
 
     [Test]
@@ -116,7 +131,7 @@ public static class UpdateRulesTests
         service.Check(T0.AddMinutes(2)).GetAwaiter().GetResult();
         Assert.Equal(null, service.Status, "nothing to show");
         Assert.True(service.LastCheck == T0.AddMinutes(2), "the try counts");
-        Assert.True(!UpdateRules.ShouldCheck(true, T0, service.LastCheck, T0.AddHours(3)), "not again for a day");
+        Assert.True(!UpdateRules.ShouldCheck(true, T0, T0, service.LastCheck, T0.AddHours(3)), "not again for a day");
     }
 
     [Test]

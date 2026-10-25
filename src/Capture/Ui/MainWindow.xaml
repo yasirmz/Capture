@@ -91,8 +91,9 @@
                    RenderOptions.BitmapScalingMode="HighQuality" AutomationProperties.Name="{l:T app}"/>
         </StackPanel>
 
-        <!-- Window buttons (above the share panel's dimmed backdrop, so the window can always be closed) -->
-        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Panel.ZIndex="20">
+        <!-- Window buttons (above the share panel's dimmed backdrop, so the window can always be closed; gone while the
+             player is full screen, which Esc leaves) -->
+        <StackPanel x:Name="WindowButtons" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Panel.ZIndex="20">
             <Button Style="{StaticResource Caption}" Content="&#xE921;" Click="OnMinimize" AutomationProperties.Name="Minimize"/>
             <Button x:Name="MaxButton" Style="{StaticResource Caption}" Content="&#xE922;" Click="OnMaximize" AutomationProperties.Name="Maximize"/>
             <Button Style="{StaticResource CaptionClose}" Content="&#xE8BB;" Click="OnClose" AutomationProperties.Name="Close"/>

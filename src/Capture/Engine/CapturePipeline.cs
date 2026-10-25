@@ -113,7 +113,7 @@ public sealed class CapturePipeline : IDisposable
     int _relief;
 
     /// <summary>What <see cref="NextRelief"/> was found with, for a step taken as the recording runs.</summary>
-    (VideoSettings Video, int Max, bool Nvidia) _reliefFrom;
+    (VideoSettings Video, int Max) _reliefFrom;
 
     /// <summary>
     /// Takes <paramref name="step"/> as the recording runs when it changes only the GPU class (<see cref="LagRelief.Live"/>):
@@ -121,23 +121,32 @@ public sealed class CapturePipeline : IDisposable
     /// </summary>
     public bool StepLive(int step)
     {
-        if (!LagRelief.Live(_relief, step, _reliefFrom.Nvidia))
+        if (!LagRelief.Live(_relief, step))
             return false;
         _relief = step;
-        SetGpuClass();
+        SetPriorities();
         FindNextRelief();
         return true;
     }
 
     /// <summary>The next lighter step from <see cref="Relief"/> (<see cref="LagRelief.Next"/>).</summary>
     void FindNextRelief() =>
-        NextRelief = LagRelief.Next(_reliefFrom.Video, _relief, _reliefFrom.Max, _reliefFrom.Nvidia, realtime: !GpuPriority.Intel);
+        NextRelief = LagRelief.Next(_reliefFrom.Video, _relief, _reliefFrom.Max, realtime: !GpuPriority.Intel && !_s.Video.GameFirst);
 
-    /// <summary>The GPU class for <see cref="Relief"/>: REALTIME at its own step only, libobs's own otherwise.</summary>
-    void SetGpuClass()
+    /// <summary>
+    /// The recording's claim on the processor and the graphics card: Windows' usual with Game first
+    /// (<see cref="VideoSettings.GameFirst"/>), so the game is never held for it; otherwise ahead of the game as OBS
+    /// runs, and REALTIME on the graphics card at its own step only.
+    /// </summary>
+    void SetPriorities()
     {
-        if (GpuPriority.SetClass(realtime: _relief == LagRelief.Realtime) is { } priority)
+        bool ahead = !_s.Video.GameFirst;
+        if (GpuPriority.SetClass(realtime: ahead && _relief == LagRelief.Realtime, raised: ahead) is { } priority)
             ObsLog.Info($"gpu priority: {priority}");
+        if (GpuPriority.SetThread(raised: ahead) is { } thread)
+            ObsLog.Info($"gpu priority: {thread}");
+        if (CpuPriority.SetProcess(raised: ahead) is { } process)
+            ObsLog.Info($"cpu priority: {process}");
     }
 
     /// <summary>
@@ -212,10 +221,9 @@ public sealed class CapturePipeline : IDisposable
             Choice = SmartSetup.PickChosen(_s.Video.Codec, usable, hw);
             _video = _s.Video;
         }
-        _reliefFrom = (_video, LagRelief.Max(hw.CpuThreads, Choice.Vendor == EncoderVendor.Software && !LagRelief.OnCpu(Relief)),
-            Choice.Vendor == EncoderVendor.Nvidia);
+        _reliefFrom = (_video, LagRelief.Max(hw.CpuThreads, Choice.Vendor == EncoderVendor.Software && !LagRelief.OnCpu(Relief)));
         FindNextRelief();
-        SetGpuClass();
+        SetPriorities();
         _video = LagRelief.Video(_video, Relief);
         if (_encoders?.NoBFrames(Choice.Id) == true)
             Choice = Choice with { NoBFrames = true }; // a start with B-frames failed on this encoder
@@ -966,7 +974,7 @@ public sealed class CapturePipeline : IDisposable
     {
         var choice = Choice!;
         using var d = new ObsData();
-        foreach (var (key, value) in EncoderCatalog.Settings(plan, choice, light: Relief >= LagRelief.LightEncoder))
+        foreach (var (key, value) in EncoderCatalog.Settings(plan, choice))
         {
             switch (value)
             {

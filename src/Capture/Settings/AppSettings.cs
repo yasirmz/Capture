@@ -194,6 +194,14 @@ public sealed record VideoSettings
     public string Preset { get; set; } = DefaultPreset;
 
     /// <summary>
+    /// The game before the recording: Capture keeps Windows' usual priorities on the processor and the graphics card, so
+    /// a game's frames never wait for the recording's (only the threads that hand pictures to the encoder go ahead, a few
+    /// milliseconds a frame). Off, the recording goes first, as OBS runs: smoother clips when a game takes every core or
+    /// the whole graphics card, a few frames less in the game.
+    /// </summary>
+    public bool GameFirst { get; set; } = true;
+
+    /// <summary>
     /// NVIDIA's slowest preset without look-ahead: its p6 and p7 turn look-ahead on (libobs keeps the preset's), which
     /// a game holding the graphics card starves (RTX 30 cards skipped 55-86 % of the frames, frozen clips; a user's
     /// report, 1.1.0). The encoder speed goes from p1 to this.

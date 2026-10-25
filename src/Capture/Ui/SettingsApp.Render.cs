@@ -240,7 +240,8 @@ public static partial class SettingsApp
         }
         // clips-pictures | viewer: the Clips page over made-up screenshots in a temp folder, and one of them in the viewer.
         // status-latest: the Status page with the made-up clip and screenshot as the latest ones.
-        string? samples = page is "clips-pictures" or "clips-chosen" or "clips-confirm" or "clips-preparing" or "viewer" or "status-latest" or "video-viewer"
+        string? samples = page is "clips-pictures" or "clips-chosen" or "clips-confirm" or "clips-preparing" or "viewer" or "status-latest"
+            or "video-viewer" or "video-viewer-full"
             || page.StartsWith("editor", StringComparison.Ordinal)
             || page.StartsWith("share", StringComparison.Ordinal)
             ? SamplePictures() : null;
@@ -570,9 +571,10 @@ public static partial class SettingsApp
                 }
             }
         }
-        else if (page == "video-viewer")
+        else if (page is "video-viewer" or "video-viewer-full")
         {
-            // A test clip from the repository (never the user's), in Capture's own player with OBS's FFmpeg for its frames.
+            // A test clip from the repository (never the user's), in Capture's own player with OBS's FFmpeg for its frames;
+            // -full: its full-screen layout (the window, never shown here, stays as it is).
             if (SampleClip() is { } clip)
             {
                 LoadRenderFfmpeg();
@@ -582,6 +584,8 @@ public static partial class SettingsApp
                     Path = clip, Name = "Desktop 2026-10-16 18-20-05", App = "Desktop",
                     Time = new DateTime(2026, 10, 16, 18, 20, 5), Size = new FileInfo(clip).Length,
                 });
+                if (page == "video-viewer-full")
+                    window.VideoLayer.ToggleFullScreenNow();
             }
         }
         else if (samples != null)

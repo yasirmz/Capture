@@ -15,7 +15,9 @@ namespace CaptureApp.Engine;
 /// <item>these and the process above normal: none lagged or skipped in any run, even with busy threads at its level.</item>
 /// </list>
 /// Both take no administrator. Capture works a few milliseconds a frame and sleeps the rest, so a game loses no more time
-/// than before, only the order changes; the heavy work (Smart Save's model) runs a step lower, at the game's level.
+/// than before, only the order changes; the heavy work (Smart Save's model) runs a step lower, at the game's level. With
+/// Game first (<see cref="Settings.VideoSettings.GameFirst"/>) the process stays normal: only the video threads go ahead,
+/// and the rest of Capture (its timers, the .NET runtime, the replay written to the disk) waits for the game.
 /// </summary>
 static class CpuPriority
 {
@@ -49,16 +51,35 @@ static class CpuPriority
     internal static ProcessPriorityClass? Raised(ProcessPriorityClass now) =>
         now == ProcessPriorityClass.Normal ? ProcessPriorityClass.AboveNormal : null;
 
-    /// <summary>The engine's process above normal (<see cref="Raised"/>); what happened, for the log.</summary>
-    public static string RaiseProcess()
+    /// <summary>
+    /// What the process goes back to from <paramref name="now"/> for Game first: normal from the above normal Capture set
+    /// (<paramref name="ownRaise"/>); null otherwise (a class someone else chose stays).
+    /// </summary>
+    internal static ProcessPriorityClass? Lowered(ProcessPriorityClass now, bool ownRaise) =>
+        ownRaise && now == ProcessPriorityClass.AboveNormal ? ProcessPriorityClass.Normal : null;
+
+    /// <summary>Whether the process was last asked raised (null: not asked yet), and whether Capture raised it.</summary>
+    static bool? _asked;
+    static bool _ownRaise;
+
+    /// <summary>
+    /// The engine's process above normal when <paramref name="raised"/> (<see cref="Raised"/>), else back to normal
+    /// (<see cref="Lowered"/>); what happened, for the log, or null when nothing was asked anew.
+    /// </summary>
+    public static string? SetProcess(bool raised)
     {
+        if (_asked == raised)
+            return null;
+        _asked = raised;
         try
         {
             using var self = Process.GetCurrentProcess();
-            if (Raised(self.PriorityClass) is not { } raised)
-                return $"left {self.PriorityClass}";
-            self.PriorityClass = raised;
-            return "above normal";
+            var now = self.PriorityClass;
+            if ((raised ? Raised(now) : Lowered(now, _ownRaise)) is not { } next)
+                return !raised && now == ProcessPriorityClass.Normal ? "normal (game first)" : $"left {now}";
+            self.PriorityClass = next;
+            _ownRaise = raised;
+            return raised ? "above normal" : "normal (game first)";
         }
         catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException)
         {

@@ -31,11 +31,21 @@ public static class UpdateRules
     /// <summary>The first look waits this long after the replay buffer is up, so a start-up is never slowed by it.</summary>
     public static readonly TimeSpan FirstDelay = TimeSpan.FromSeconds(60);
 
+    /// <summary>
+    /// The first look when the replay buffer is not up by then (instant replay off, waiting for a game, or failing):
+    /// this long after the start. Before, such a Capture never looked, and never heard of a fix.
+    /// </summary>
+    public static readonly TimeSpan NoBufferDelay = TimeSpan.FromMinutes(5);
+
     public static readonly TimeSpan Interval = TimeSpan.FromHours(24);
 
-    /// <summary>Time to look for an update: turned on, a minute after the replay buffer first ran, then once a day.</summary>
-    public static bool ShouldCheck(bool enabled, DateTime? bufferActiveSince, DateTime? lastCheck, DateTime now) =>
-        enabled && bufferActiveSince is { } since && now - since >= FirstDelay && (lastCheck is not { } last || now - last >= Interval);
+    /// <summary>
+    /// Time to look for an update: turned on, a minute after the replay buffer first ran (or <see cref="NoBufferDelay"/>
+    /// after <paramref name="started"/> without it), then once a day.
+    /// </summary>
+    public static bool ShouldCheck(bool enabled, DateTime? bufferActiveSince, DateTime started, DateTime? lastCheck, DateTime now) =>
+        enabled && (bufferActiveSince is { } since && now - since >= FirstDelay || now - started >= NoBufferDelay)
+        && (lastCheck is not { } last || now - last >= Interval);
 
     /// <summary>Each new version gets one notice, ever.</summary>
     public static bool ShouldNotify(string version, IReadOnlySet<string> seen) => !seen.Contains(version);

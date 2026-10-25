@@ -60,8 +60,9 @@ public static partial class ObsHost
             throw new InvalidOperationException("obs_reset_audio failed");
         if (!ResetVideo(video))
             throw new InvalidOperationException("obs_reset_video failed");
-        ObsLog.Info($"gpu priority: {GpuPriority.Raise()}");
-        ObsLog.Info($"cpu priority: {CpuPriority.RaiseProcess()}");
+        // The priorities follow Game first, set with each pipeline (CapturePipeline.SetPriorities).
+        if (GpuPriority.Find() is { } gpu)
+            ObsLog.Info($"gpu priority: {gpu}");
         long graphics = clock.ElapsedMilliseconds;
 
         _root = appFolder;
