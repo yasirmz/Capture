@@ -762,14 +762,17 @@ public sealed class EngineApp : ApplicationContext
         : (Text.Get("toast.notSaved"), Text.Get(reason));
 
     /// <summary>
-    /// The app being captured now (its folder name): the chosen window's app while it is recorded, or what is in front;
-    /// for a clip of <paramref name="clipSeconds"/>, the game played just before when that is the desktop or Capture
-    /// (<see cref="ClipOrganizer.SaveFolderName"/>).
+    /// The app being captured now (its folder name): the chosen window's app while it is recorded, the game whose picture
+    /// is recorded, or what is in front; for a clip of <paramref name="clipSeconds"/>, the game played just before when
+    /// that is the desktop or Capture (<see cref="ClipOrganizer.SaveFolderName"/>).
     /// </summary>
     string? CapturedApp(double? clipSeconds = null)
     {
         if (SceneRules.RecordsChosenWindow(_settings.Capture, _pipeline?.CaptureNotice) && WindowTarget.ExeName(ChosenWindow) is { } exe)
             return ForegroundApp.ForExe(exe);
+        // Whatever window has the keys: a user's screenshot of Dead by Daylight went to "Taskmgr", in front on the other screen.
+        if (_pipeline?.GamePictureExe is { } game)
+            return ForegroundApp.ForExe(Path.GetFileNameWithoutExtension(game));
         if (clipSeconds is not { } seconds || _lastGame is not { } last)
             return ForegroundApp.Current();
         return ClipOrganizer.SaveFolderName(ForegroundApp.Current(), ForegroundApp.IsCapture, () => ForegroundApp.ForProcess(last.Pid, last.Exe),

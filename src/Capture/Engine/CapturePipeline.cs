@@ -44,7 +44,9 @@ public sealed class CapturePipeline : IDisposable
     IntPtr _window, _game, _screenLayer, _windowItem;
     /// <summary>The game capture whose "unhooked" signal brings back, at once, the capture under it.</summary>
     IntPtr _hookSource;
-    ObsSignalCallback? _onUnhooked;
+    ObsSignalCallback? _onUnhooked, _onHooked;
+    /// <summary>The program file the game capture hooked ("DeadByDaylight-Win64-Shipping.exe"), from its "hooked" signal.</summary>
+    volatile string? _hookedExe;
     /// <summary>
     /// The captures under a game (the screen, One app's window) change on the engine's tick and on libobs's graphics
     /// thread (the signal): one at a time.
@@ -542,13 +544,25 @@ public sealed class CapturePipeline : IDisposable
         _hookSource = source;
         _onUnhooked = (_, _) =>
         {
+            _hookedExe = null;
             if (_mode == CaptureMode.Window)
                 PlaceWindow(gamePicture: false, onGraphicsThread: true);
             else
                 PlaceScreen(gamePicture: false, onGraphicsThread: true);
         };
-        Obs.signal_handler_connect(Obs.obs_source_get_signal_handler(source), "unhooked", _onUnhooked, IntPtr.Zero);
+        // Which game it is, for the clips' names (GamePictureExe)
+        _onHooked = (_, calldata) =>
+            _hookedExe = Obs.calldata_get_string(calldata, "executable", out IntPtr exe) ? Obs.Utf8(exe) : null;
+        var signals = Obs.obs_source_get_signal_handler(source);
+        Obs.signal_handler_connect(signals, "unhooked", _onUnhooked, IntPtr.Zero);
+        Obs.signal_handler_connect(signals, "hooked", _onHooked, IntPtr.Zero);
     }
+
+    /// <summary>
+    /// The program file of the game the picture comes from now ("DeadByDaylight-Win64-Shipping.exe"): a game capture
+    /// hooked it and shows it (<see cref="GameGivesPicture"/>); null otherwise.
+    /// </summary>
+    public string? GamePictureExe => GameGivesPicture ? _hookedExe : null;
 
     /// <summary>
     /// Games, once a second: the screen goes off under a hooked game (<see cref="PlaceScreen"/>); a game in front that
@@ -1622,8 +1636,11 @@ public sealed class CapturePipeline : IDisposable
         if (_onUnhooked != null)
         {
             // Returns once a signal under way has ended: none comes after the sources go.
-            Obs.signal_handler_disconnect(Obs.obs_source_get_signal_handler(_hookSource), "unhooked", _onUnhooked, IntPtr.Zero);
-            _onUnhooked = null;
+            var signals = Obs.obs_source_get_signal_handler(_hookSource);
+            Obs.signal_handler_disconnect(signals, "unhooked", _onUnhooked, IntPtr.Zero);
+            Obs.signal_handler_disconnect(signals, "hooked", _onHooked!, IntPtr.Zero);
+            _onUnhooked = _onHooked = null;
+            _hookedExe = null;
         }
         lock (_underGate)
             _screenLayer = IntPtr.Zero;

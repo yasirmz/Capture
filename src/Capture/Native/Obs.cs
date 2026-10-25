@@ -328,6 +328,9 @@ public static class Obs
     public static extern void signal_handler_disconnect(IntPtr handler, [MarshalAs(U8)] string signal, ObsSignalCallback callback, IntPtr data);
     [DllImport(Lib, CallingConvention = Cc)] [return: MarshalAs(UnmanagedType.U1)]
     public static extern bool calldata_get_string(ref CallData calldata, [MarshalAs(U8)] string name, out IntPtr str);
+    /// <summary>The same on the calldata a signal callback is given.</summary>
+    [DllImport(Lib, CallingConvention = Cc)] [return: MarshalAs(UnmanagedType.U1)]
+    public static extern bool calldata_get_string(IntPtr calldata, [MarshalAs(U8)] string name, out IntPtr str);
     [DllImport(Lib, CallingConvention = Cc)]
     static extern void calldata_set_data(ref CallData calldata, [MarshalAs(U8)] string name, ref byte value, UIntPtr size);
 

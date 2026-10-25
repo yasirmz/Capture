@@ -53,10 +53,15 @@ public static partial class SelfTest
             hooked = pipeline.GameHooked;
         }
         int colours = CanvasColours(pipeline, folder);
-        output.WriteLine($"scene games-game: the screen copied with no game {copiedAlone}, the game hooked {hooked}, {colours} colours");
+        // Clips are named after the game the picture comes from, whatever window has the keys (EngineApp.CapturedApp)
+        string? named = pipeline.GamePictureExe;
+        output.WriteLine($"scene games-game: the screen copied with no game {copiedAlone}, the game hooked {hooked}, {colours} colours, " +
+                         $"named after {named ?? "nothing"}");
         string? why = !copiedAlone ? "no game: the screen it falls back to is not copied"
             : !hooked ? "the game was never hooked"
             : colours <= 1 ? "the canvas is black"
+            : !string.Equals(named, WindowTarget.ExeName(window) + ".exe", StringComparison.OrdinalIgnoreCase)
+                ? $"the clips would not be named after the game ({named ?? "none"})"
             : HookedGame(pipeline, folder, output, window, screenLit);
         pipeline.WatchGame();
         why ??= pipeline.ScreenCopied ? null : "the game gone, the screen is not copied";
